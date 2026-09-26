@@ -110,7 +110,34 @@
     header{gap:8px}
     button,select,label{font-size:14px}
   }
+
+  .appTitleCluster{display:inline-flex;align-items:center;gap:6px;margin-right:2px}
+  .appTitleCluster .appTitle{margin-right:0}
+  .titleIcon{
+    display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;
+    border:1px solid var(--pill-b);border-radius:999px;background:#fff;color:#4f7f73;
+    box-shadow:0 4px 12px rgba(94,162,146,.14);flex:0 0 auto
+  }
+  .titleIcon:hover{background:#f2fbf8;filter:none}
+  .titleIcon svg{width:18px;height:18px;display:block}
+  .titleIcon.helpBtn{width:34px;height:34px;margin-left:0;font-size:15px}
+  #qrOverlay{position:fixed;inset:0;background:rgba(30,42,38,.34);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
+  #qrOverlay.open{display:flex}
+  #qrCard{width:min(520px,calc(100vw - 32px));background:#fffdf8;border:1px solid var(--line);border-radius:24px;box-shadow:0 24px 80px rgba(0,0,0,.24);padding:22px;text-align:center}
+  #qrCard h2{margin:0 0 6px;font-size:20px;color:#48645e}
+  #qrCard p{margin:4px 0 14px;color:var(--muted)}
+  #qrClose{float:right;padding:6px 10px}
+  #qrCode{display:flex;align-items:center;justify-content:center;min-height:300px;padding:12px}
+  #qrCode img,#qrCode canvas{width:min(300px,72vw)!important;height:min(300px,72vw)!important;image-rendering:pixelated}
+  .qrUrl{font-size:13px;color:#536b65;word-break:break-all;background:#f2fbf8;border:1px solid var(--pill-b);border-radius:12px;padding:8px 10px}
+  #siteCredit{
+    position:fixed;right:10px;bottom:7px;z-index:18;padding:3px 8px;border-radius:999px;
+    font-size:11px;line-height:1.35;color:rgba(72,100,94,.82);background:rgba(255,253,248,.78);
+    border:1px solid rgba(191,228,217,.72);backdrop-filter:blur(8px);pointer-events:none
+  }
+  @media (max-width:700px){#siteCredit{right:6px;bottom:5px;font-size:9px;padding:2px 6px}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
@@ -141,7 +168,13 @@
 </script>
 
 <header>
-  <div class="appTitle">みまもりAI <span class="ver">v2026.07.24.1</span></div>
+  <div class="appTitleCluster">
+    <button id="appQrBtn" class="titleIcon" type="button" aria-label="このアプリのQRコード" title="QRコード">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 3h8v8H3V3Zm2 2v4h4V5H5Zm8-2h8v8h-8V3Zm2 2v4h4V5h-4ZM3 13h8v8H3v-8Zm2 2v4h4v-4H5Zm10-2h2v2h-2v-2Zm4 0h2v4h-2v-4Zm-6 4h2v4h-2v-4Zm4 0h2v2h-2v-2Zm2 2h2v2h-2v-2Zm-4 0h2v2h-2v-2Z"/></svg>
+    </button>
+    <div class="appTitle">みまもりAI <span class="ver">v2026.07.24.1</span></div>
+    <button type="button" class="helpBtn titleIcon appHelpBtn" data-help="app" aria-label="アプリの特徴と使い方" title="ヘルプ">?</button>
+  </div>
   <span class="toolbarGroup record">
     <button id="start">▶ カメラ起動</button>
     <button id="stop" hidden disabled>■ 停止</button>
@@ -322,6 +355,17 @@
     </table>
   </div>
 </section>
+<div id="qrOverlay" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+  <div id="qrCard">
+    <button id="qrClose" type="button">閉じる</button>
+    <h2 id="qrTitle">このアプリを開く</h2>
+    <p>スマートフォンやタブレットで読み取ってください。</p>
+    <div id="qrCode" aria-label="https://scd-ku.github.io/tracker/ のQRコード"></div>
+    <div class="qrUrl">https://scd-ku.github.io/tracker/</div>
+  </div>
+</div>
+<div id="siteCredit">Science Comunication Design Laboratory, Kagawa University</div>
+
 <div id="helpOverlay" role="dialog" aria-modal="true">
   <div id="helpCard">
     <button id="helpClose" type="button">閉じる</button>
@@ -402,6 +446,11 @@ const helpOverlay = document.getElementById('helpOverlay');
 const helpTitle = document.getElementById('helpTitle');
 const helpBody = document.getElementById('helpBody');
 const helpClose = document.getElementById('helpClose');
+const APP_URL = 'https://scd-ku.github.io/tracker/';
+const appQrBtn = document.getElementById('appQrBtn');
+const qrOverlay = document.getElementById('qrOverlay');
+const qrCode = document.getElementById('qrCode');
+const qrClose = document.getElementById('qrClose');
 const detectedBar = document.getElementById('detectedBar');
 const tplToggle = document.getElementById('tplToggle');
 const sidePanel = document.getElementById('side');
@@ -564,6 +613,26 @@ const tplSizeEl= document.getElementById('tplSize');
 const tplScoreEl=document.getElementById('tplScore');
 
 const HELP_TEXT = {
+  app: {
+    title:'アプリの特徴と使い方',
+    body:`<p><b>みまもりAI</b>は、カメラ映像や読み込んだ動画を使って、人物・物体・顔の追跡と、表情・顔向き・口の開き・発話・音量などを時間軸で記録・可視化するブラウザアプリです。</p>
+    <h3>主な特徴</h3>
+    <ul>
+      <li>YOLOによる人物・物体・顔の検出と追跡、手動テンプレート追跡</li>
+      <li>POSTER V2 / POSTER++、EmotiEffLibによる表情分析</li>
+      <li>顔向き・口の開き、発話ON/OFF・音量の記録とグラフ表示</li>
+      <li>カメラ録画・音声録音、CSV保存、動画・音声・CSVの読み込み</li>
+      <li>Whisperによる文字起こしとWavLMによる話者分離</li>
+    </ul>
+    <h3>基本的な使い方</h3>
+    <ol>
+      <li>「カメラ起動」を押し、必要に応じてモード・クラス・対象ID・表情分析方法を選びます。</li>
+      <li>記録したい項目を選び、「この対象だけ記録」を必要に応じてONにします。</li>
+      <li>「記録開始」で計測を開始し、グラフで時間変化を確認します。</li>
+      <li>終了後はCSV、録画、録音、文字起こし結果を保存できます。既存の動画・音声・CSVを読み込んで解析することもできます。</li>
+    </ol>
+    <p>各機能の横にある「?」を押すと、その手法や注意点の詳しい説明を確認できます。</p>`
+  },
   mode: {
     title:'モードの手法',
     body:`<p><b>何を探すかを選ぶ場所</b>です。YOLOは写真の中から「顔」「人」「物」を四角で見つけるAIです。テンプレートは、先生が選んだ小さな絵柄を次のフレームから探し続ける方法です。</p>
@@ -639,6 +708,29 @@ document.querySelectorAll('.helpBtn').forEach(btn=>btn.addEventListener('click',
 }));
 helpClose.addEventListener('click', ()=>helpOverlay.classList.remove('open'));
 helpOverlay.addEventListener('click', e=>{ if(e.target===helpOverlay) helpOverlay.classList.remove('open'); });
+function buildAppQr(){
+  if(qrCode.dataset.ready) return;
+  qrCode.innerHTML='';
+  if(window.QRCode){
+    new QRCode(qrCode,{text:APP_URL,width:300,height:300,correctLevel:QRCode.CorrectLevel.H});
+    qrCode.dataset.ready='1';
+  }else{
+    qrCode.innerHTML='<p>QRコードを生成できませんでした。下のURLを開いてください。</p>';
+  }
+}
+function openAppQr(){
+  buildAppQr();
+  qrOverlay.classList.add('open');
+}
+appQrBtn.addEventListener('click', openAppQr);
+qrClose.addEventListener('click', ()=>qrOverlay.classList.remove('open'));
+qrOverlay.addEventListener('click', e=>{ if(e.target===qrOverlay) qrOverlay.classList.remove('open'); });
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    qrOverlay.classList.remove('open');
+    helpOverlay.classList.remove('open');
+  }
+});
 
 /* ===== 状態 ===== */
 let W=640, H=360;
